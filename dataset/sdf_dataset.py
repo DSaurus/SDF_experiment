@@ -48,14 +48,24 @@ class SDFDataset(Dataset):
 
         print("pts ratio:", np.sum(sdf) / (64**3))
 
-        z, y, x = torch.meshgrid(torch.linspace(-1, 1, 64),
-            torch.linspace(-1, 1, 64),
-            torch.linspace(-1, 1, 64))
-        sample_pts = torch.cat([x.reshape(-1, 1), y.reshape(-1, 1), z.reshape(-1, 1)], dim=1).numpy()
+        # z, y, x = torch.meshgrid(torch.linspace(-1, 1, 64),
+        #     torch.linspace(-1, 1, 64),
+        #     torch.linspace(-1, 1, 64))
+        # sample_pts = torch.cat([x.reshape(-1, 1), y.reshape(-1, 1), z.reshape(-1, 1)], dim=1).numpy()
+        surface_pts, _ = trimesh.sample.sample_surface(mesh, 64*64*64)
+
+        sample_pts = surface_pts + np.random.normal(scale=0.2, size=sample_pts.shape)
+        inside = mesh.contains(sample_pts)
+
+        sample_pts -= (b_max + b_min) / 2
+        sample_pts /= (b_max - b_min) / 2
+        gt_pts = np.zeros((64*64*64))
+        gt_pts[inside] = 1
 
         res = {
             "sdf" : torch.FloatTensor(sdf).unsqueeze(3).permute(3, 0, 1, 2),
-            "pts" : torch.FloatTensor(sample_pts)
+            "pts" : torch.FloatTensor(sample_pts),
+            "gt_pts" : torch.FloatTensor(gt_pts)
         }
 
         return res
