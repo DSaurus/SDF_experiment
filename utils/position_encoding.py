@@ -56,6 +56,12 @@ def position_encoding_batch(x, dims):
     bn = np.transpose(np.array(bn))
     return np.concatenate((an, bn), axis=1)
 
+def position_encoding_xyz(pts, dims):
+    x_encoding = position_encoding_batch(pts[:, 0], 64)
+    y_encoding = position_encoding_batch(pts[:, 1], 64)
+    z_encoding = position_encoding_batch(pts[:, 2], 64)
+    return np.concatenate([x_encoding, y_encoding, z_encoding], axis=1)
+
 if __name__ == "__main__":
     x = np.array([1, 0.5, 0.2])
     res = position_encoding_batch(x, 64)

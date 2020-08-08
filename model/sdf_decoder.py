@@ -32,6 +32,8 @@ class SDFDecoder(nn.Module):
         )
 
     def forward(self, x, pos_encoding=False):
+        # x [B, C, N]
+        # return [B, 1, N]
         if pos_encoding:
             return self.pos_stage(x)
         return self.stage1(x)

@@ -1,14 +1,16 @@
 import torch
-from dataset.sdf_dataset import SDFDataset
-from model.sdf_decoder import SDFDecoder
-from model.sdf_encoder import SDFEncoder
 from torch.utils.data.dataloader import DataLoader
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 from skimage import measure
-from utils.file_io import *
 import numpy as np
 import time
+
+from dataset.sdf_dataset import SDFDataset
+from model.sdf_decoder import SDFDecoder
+from model.sdf_encoder import SDFEncoder
+from utils.mesh import gen_mesh
+from utils.file_io import *
 
 cuda = torch.device('cuda:0')
 
@@ -16,8 +18,8 @@ logger = SummaryWriter('sdf_results')
 
 if __name__ == "__main__":
     np.random.seed(int(time.time()))
-    dataset = SDFDataset('../twim_data')
-    dataloader = DataLoader(dataset, batch_size=10, num_workers=4)
+    dataset = SDFDataset('../twim_data', random_pts=True)
+    dataloader = DataLoader(dataset, batch_size=1, num_workers=1, shuffle=True)
 
     encoder = SDFEncoder()
     decoder = SDFDecoder()
@@ -43,6 +45,7 @@ if __name__ == "__main__":
             pts = data["pts"].to(cuda)
             pos_encoding = data["pos_encoding"].to(cuda)
             gt_pts = data["gt_pts"].to(cuda)
+            scale = data["scale"]
 
             net_code = encoder(sdf)
             code = net_code.reshape(-1, 512)
@@ -71,12 +74,19 @@ if __name__ == "__main__":
             print("loss:", loss.item()) 
             # print(torch.sum(net_sdf) / pts.shape[0])       
             
-            # if train_idx == 0:
-            #     show_sdf = net_sdf.detach().cpu().numpy()[0].reshape((64, 64, 64))
-            #     print(show_sdf.shape)
-            #     print(np.max(show_sdf))
-            #     vs, fcs, vn, _ = measure.marching_cubes(show_sdf)
-            #     export_obj('obj_results/%d_test.obj' % epoch, vs, fcs, vn)
+            if train_idx == 0:
+                scale = scale[0].numpy()
+                gen_mesh('obj_results/%d_test.obj' % epoch, decoder, net_code[0].reshape(-1, 512, 1), scale)
+                export_one_pts('pts.obj', pts[0].detach().cpu().reshape(-1, 3).numpy() * scale, 
+                    net_sdf[0].detach().cpu().reshape(-1).numpy())
+                export_one_pts('gt_pts.obj', pts[0].detach().cpu().reshape(-1, 3).numpy() * scale, 
+                    gt_pts[0].detach().cpu().reshape(-1).numpy())
+                exit(0)
+                # show_sdf = net_sdf.detach().cpu().numpy()[0].reshape((64, 64, 64))
+                # print(show_sdf.shape)
+                # print(np.max(show_sdf))
+                # vs, fcs, vn, _ = measure.marching_cubes(show_sdf)
+                # export_obj( % epoch, vs, fcs, vn)
                 
 
             log_file.write("%f\n" % loss.item())   

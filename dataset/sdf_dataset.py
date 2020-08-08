@@ -5,15 +5,16 @@ import trimesh
 import trimesh.repair as rp
 from torch.utils.data import Dataset
 from utils.file_io import export_obj, export_pts_cloud
-from utils.position_encoding import position_encoding_batch
+from utils.position_encoding import position_encoding_xyz
 from skimage import measure
 
 class SDFDataset(Dataset):
-    def __init__(self, obj_path):
+    def __init__(self, obj_path, random_pts = False):
         super(SDFDataset, self).__init__()
 
         self.obj_path = obj_path
         self.obj_names = os.listdir(obj_path)
+        self.random_pts = random_pts
     
 
     def __getitem__(self, index):
@@ -55,25 +56,30 @@ class SDFDataset(Dataset):
         # sample_pts = torch.cat([x.reshape(-1, 1), y.reshape(-1, 1), z.reshape(-1, 1)], dim=1).numpy()
         surface_pts, _ = trimesh.sample.sample_surface(mesh, 5000)
 
-        sample_pts = surface_pts + np.random.normal(scale=0.5, size=surface_pts.shape)
+        sample_pts = surface_pts + np.random.normal(scale=0.2, size=surface_pts.shape)
+        if self.random_pts:
+            random_pts = np.random.rand(5000, 3) * (b_max - b_min) + b_min
+            sample_pts = np.concatenate([sample_pts, random_pts], axis=0)
         inside = mesh.contains(sample_pts)
 
         sample_pts -= (b_max + b_min) / 2
         sample_pts /= (b_max - b_min) / 2
-        gt_pts = np.zeros((5000))
+
+        if self.random_pts:
+            gt_pts = np.zeros((10000))
+        else:
+            gt_pts = np.zeros((5000))
         gt_pts[inside] = 1
 
         # position encoding
-        x_encoding = position_encoding_batch(sample_pts[:, 0], 64)
-        y_encoding = position_encoding_batch(sample_pts[:, 1], 64)
-        z_encoding = position_encoding_batch(sample_pts[:, 2], 64)
-        pos_encoding = np.concatenate([x_encoding, y_encoding, z_encoding], axis=1)
+        pos_encoding = position_encoding_xyz(sample_pts, 64)
 
         res = {
             "sdf" : torch.FloatTensor(sdf).unsqueeze(3).permute(3, 0, 1, 2),
             "pts" : torch.FloatTensor(sample_pts),
             "pos_encoding" : torch.FloatTensor(pos_encoding),
-            "gt_pts" : torch.FloatTensor(gt_pts)
+            "gt_pts" : torch.FloatTensor(gt_pts),
+            "scale" : torch.FloatTensor(b_max - b_min)
         }
 
         return res
