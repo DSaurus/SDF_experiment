@@ -18,5 +18,20 @@ class SDFDecoder(nn.Module):
             nn.Sigmoid()
         )
 
-    def forward(self, x):
+        self.pos_stage = nn.Sequential(
+            nn.Conv1d(512 + 3 * 128, 512, 1, 1, 0),
+            nn.LeakyReLU(),
+            nn.Conv1d(512, 256, 1, 1, 0),
+            nn.LeakyReLU(),
+            nn.Conv1d(256, 128, 1, 1, 0),
+            nn.LeakyReLU(),
+            nn.Conv1d(128, 64, 1, 1, 0),
+            nn.LeakyReLU(),
+            nn.Conv1d(64, 1, 1, 1, 0),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x, pos_encoding=False):
+        if pos_encoding:
+            return self.pos_stage(x)
         return self.stage1(x)
